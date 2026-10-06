@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CG Exam Master</title>
+<title>Dipra Classes CG</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#14532d">
 <meta name="google-adsense-account" content="ca-pub-2502519038232049">
@@ -81,12 +81,31 @@ li{margin-bottom:6px}
 .ra.ok{background:var(--okbg);border:1px solid var(--ok)}
 .ra.bad{background:var(--badbg);border:1px solid var(--bad)}
 .rx{font-size:.88rem;color:var(--mut);margin-top:6px}
+.mini{height:6px;border-radius:6px;background:var(--line);overflow:hidden;margin-top:6px}
+.mini i{display:block;height:100%;background:var(--ok)}
+.pill{display:inline-block;background:var(--badbg);color:var(--bad);border-radius:20px;padding:3px 10px;font-size:.78rem;font-weight:700;margin-top:6px;cursor:pointer}
+.pill.g{background:var(--hint);color:#8a6200;cursor:default}
+.qrow{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.starb{background:none;border:0;font-size:1.6rem;color:var(--gold);cursor:pointer;line-height:1;padding:0 2px;flex:none}
+.star{font-size:1.4rem;color:var(--gold)}
+#tm{font-variant-numeric:tabular-nums;font-weight:700}
+#tm.over{color:var(--bad)}
+.row .t .chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:5px}
+.row .t .c{font-size:.8rem;font-weight:700;border-radius:8px;padding:2px 8px;background:var(--bg);color:var(--mut)}
+.row .t .c.g{background:var(--okbg);color:var(--ok)}
+.row .t .c.b{background:var(--badbg);color:var(--bad)}
+.ck{display:flex;gap:12px;align-items:flex-start;background:var(--card);border:1.5px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px;cursor:pointer}
+.ck input{width:24px;height:24px;accent-color:var(--pri);flex:none;margin:1px 0 0}
+.ck a{color:var(--pri);font-weight:700}
+.btn:disabled{opacity:.45;cursor:default}
+.disc{font-size:.8rem;color:var(--mut);text-align:center;margin:14px 4px 0;line-height:1.5}
+.disc a{color:var(--pri);font-weight:700}
 </style>
 </head>
 <body>
 <div class="top"><div class="top-in">
-  <div class="logo">CG</div>
-  <div class="brand"><b>CG Exam Master</b><span>CGPSC मॉक टेस्ट अभ्यास</span></div>
+  <div class="logo">DC</div>
+  <div class="brand"><b>Dipra Classes CG</b><span>CGPSC और CGSSB टेस्ट सीरीज़</span></div>
   <button class="ib" id="rf" title="प्रश्न रीफ़्रेश करें" aria-label="रीफ़्रेश">⟳</button>
 </div></div>
 <main id="app"></main>
@@ -238,32 +257,75 @@ function errText(e){
 }
 const count=b=>Object.values(b).reduce((s,a)=>s+a.length,0);
 
+const PK="cgem_prog_v1";
+const MINW=5, SECQ=72; // 72 सेकंड प्रति प्रश्न (15 प्रश्न = 18 मिनट)
+let P=(()=>{try{const o=JSON.parse(LS(PK)||"null");if(o&&o.sub&&Array.isArray(o.bm))return o}catch(e){}return {u:0,sub:{},bm:[]}})();
+const save=()=>LSset(PK,JSON.stringify(P));
+const SP=s=>(P.sub[s] ||= {r:0,w:0,s:0,done:[],cyc:[],wr:[]});
+const hk=(s,q)=>{let h=5381;const t=s+"|"+String(q).trim();for(let i=0;i<t.length;i++)h=((h<<5)+h+t.charCodeAt(i))|0;return (h>>>0).toString(36)};
+let idx={};
+function indexBank(){ idx={}; Object.keys(bank).forEach(s=>bank[s].forEach(x=>{x.k=hk(s,x.q);x.s=s;idx[x.k]=x})); }
+function toggleBm(k){const i=P.bm.indexOf(k); if(i>=0)P.bm.splice(i,1); else P.bm.push(k); save(); return i<0}
+
+let tickId=null;
+function fmtT(s){const a=Math.abs(s),m=Math.floor(a/60),r=a%60;return (s<0?"−":"")+String(m).padStart(2,"0")+":"+String(r).padStart(2,"0")}
+function paintT(){ const el=document.getElementById("tm"); if(!el||!quiz) return; const rem=Math.ceil(quiz.blk*SECQ-quiz.tel); el.textContent=fmtT(rem); el.className=rem<0?"over":""; }
+function stopTick(){ if(tickId){clearInterval(tickId);tickId=null} }
+function startTick(){ stopTick(); quiz.lt=Date.now(); tickId=setInterval(()=>{ if(!quiz){stopTick();return} const n=Date.now(),d=(n-quiz.lt)/1000; quiz.lt=n; if(quiz.timing&&!document.hidden&&d<3) quiz.tel+=d; paintT(); },500); }
+
 async function load(){
   app.innerHTML='<p class="src" style="text-align:center;padding:30px 0">प्रश्न लोड हो रहे हैं…</p>';
-  const url=DEFAULT_SHEET;
+  const url=DEFAULT_SHEET; let ok=false, err="";
   if(url){
     try{
       const txt=await fetchCsv(url); const b=build(parseCSV(txt));
       if(!Object.keys(b).length) throw new Error("empty");
-      bank=b; LSset("cgem_csv",txt); meta.src="Google Sheet से ताज़ा प्रश्न";
-    }catch(e){
-      const c=LS("cgem_csv"); const b=c?build(parseCSV(c)):{};
-      if(Object.keys(b).length){bank=b;meta.src="ऑफ़लाइन कॉपी · इंटरनेट नहीं मिला"}
-      else{bank=build(SAMPLE);meta.src="सैंपल प्रश्न · इंटरनेट जाँचकर ⟳ दबाएँ"}
-    }
-  }else{bank=build(SAMPLE);meta.src="सैंपल प्रश्न"}
-  home(true);
+      bank=b; meta.src="Google Sheet से ताज़ा प्रश्न"; ok=true;
+    }catch(e){ err=String(e&&e.message||e); }
+  }else{ bank=build(SAMPLE); meta.src="सैंपल प्रश्न"; ok=true }
+  if(!ok){
+    app.innerHTML=`<div class="card" style="text-align:center;margin-top:24px"><div style="font-size:2rem">📶</div><h3>प्रश्न लोड नहीं हो सके</h3><div style="color:var(--mut);font-size:.92rem">ऐप चलाने के लिए इंटरनेट ज़रूरी है। इंटरनेट चालू करके नीचे दबाएँ।</div><button class="btn full" id="retry" style="margin-top:14px">फिर कोशिश करें</button></div>`;
+    document.getElementById("retry").onclick=load; return;
+  }
+  indexBank(); home();
 }
 
-function home(fresh){
-  quiz=null;
+function home(){
+  quiz=null; stopTick();
   const subs=Object.keys(bank);
-  app.innerHTML=`<div class="stats"><div class="stat"><b>${subs.length}</b><span>विषय</span></div><div class="stat"><b>${count(bank)}</b><span>कुल प्रश्न</span></div></div>
-  <p class="src">स्रोत: ${esc(meta.src)}</p>
+  let tr=0,tw=0;
+  subs.forEach(s=>{const p=P.sub[s]; if(p){tr+=p.r;tw+=p.w}});
+  const att=tr+tw, pct=att?Math.round(tr*100/att):0;
+  const bmN=P.bm.filter(k=>idx[k]).length;
+  app.innerHTML=`<div class="stats"><div class="stat"><b>${att}</b><span>प्रश्न हल</span></div><div class="stat"><b>${att?pct+"%":"–"}</b><span>सही उत्तर</span></div><div class="stat"><b>${fmt(P.u)}</b><span>कुल अंक</span></div></div>
   <h2>विषय चुनें</h2>`+
-  subs.map((s,i)=>`<button class="row" data-i="${i}"><div class="badge" style="background:${COLORS[i%COLORS.length]}">${esc([...s][0])}</div><div class="t"><b>${esc(s)}</b><span>${bank[s].length} प्रश्न · अनंत अभ्यास</span></div><span class="chev">›</span></button>`).join("")+
-  `<p class="note">प्रश्न मिले-जुले क्रम में आते हैं। किसी विषय के सारे प्रश्न आने के बाद ही कोई प्रश्न दोबारा आता है।</p>`;
-  app.querySelectorAll(".row").forEach(b=>b.onclick=()=>start(subs[b.dataset.i]));
+  subs.map((s,i)=>{
+    const p=P.sub[s], n=bank[s].length, ds=new Set(p?p.done:[]), ws=new Set(p?p.wr:[]);
+    const done=bank[s].filter(x=>ds.has(x.k)).length, wn=bank[s].filter(x=>ws.has(x.k)).length;
+    return `<div class="row" data-i="${i}" role="button"><div class="badge" style="background:${COLORS[i%COLORS.length]}">${esc([...s][0])}</div><div class="t"><b>${esc(s)}</b>${done?`<div class="chips"><span class="c">हल ${done}</span><span class="c g">✓ सही ${p.r}</span><span class="c b">✗ गलत ${p.w}</span></div>`:`<span>अभी शुरू नहीं किया</span>`}${wn?`<span class="pill" data-w="${i}">↻ गलत दोहराएँ (${wn})</span>`:""}</div><span class="chev">›</span></div>`;
+  }).join("")+
+  `<div class="row" id="bmrow" role="button" style="justify-content:center"><span class="star">★</span><b>सहेजे प्रश्न (${bmN})</b></div>
+  <p class="note" style="text-align:center">प्रश्न मिले-जुले क्रम में आते हैं। किसी विषय के सारे प्रश्न आने के बाद ही कोई प्रश्न दोबारा आता है।</p>
+  <p class="disc">यह एक निजी अभ्यास ऐप है। इसका CGPSC, CGSSB या किसी भी सरकारी संस्था से कोई संबंध नहीं है।<br><a href="${POLICY}" target="_blank" rel="noopener">प्राइवेसी पॉलिसी</a></p>
+  <p class="note" style="text-align:center" id="rsw"><a href="#" id="rs" style="color:var(--mut)">प्रगति रीसेट करें</a></p>`;
+  app.querySelectorAll(".row[data-i]").forEach(b=>b.onclick=()=>start(subs[b.dataset.i],"n"));
+  app.querySelectorAll(".pill[data-w]").forEach(b=>b.onclick=ev=>{ev.stopPropagation();start(subs[b.dataset.w],"w")});
+  document.getElementById("bmrow").onclick=bmView;
+  document.getElementById("rs").onclick=ev=>{
+    ev.preventDefault();
+    document.getElementById("rsw").innerHTML='सारी प्रगति मिट जाएगी, पक्का? <button class="btn sm" id="rsy">हाँ, रीसेट करें</button> <button class="btn ghost sm" id="rsn">नहीं</button>';
+    document.getElementById("rsy").onclick=()=>{P={u:0,sub:{},bm:[]};save();home()};
+    document.getElementById("rsn").onclick=home;
+  };
+}
+
+function bmView(){
+  pushS();
+  const items=P.bm.map(k=>idx[k]).filter(Boolean);
+  app.innerHTML=`<div class="bar"><button class="btn sm" id="back">← होम</button></div><h2>★ सहेजे प्रश्न (${items.length})</h2>`+
+  (items.length?items.map(x=>`<div class="card"><div class="qrow"><div class="rq">${esc(x.q)}</div><button class="starb on" data-k="${x.k}">★</button></div><div class="ra ok">✓ सही उत्तर: ${L[x.a]}. ${esc(x.o[x.a])}</div>${x.e?`<div class="rx">${esc(x.e)}</div>`:""}<div class="note" style="margin-top:6px">${esc(x.s)}</div></div>`).join(""):`<div class="card">अभी कोई प्रश्न सहेजा नहीं है। प्रश्न के कोने में ☆ दबाकर सहेजें।</div>`);
+  document.getElementById("back").onclick=goHome;
+  app.querySelectorAll(".starb").forEach(b=>b.onclick=()=>{toggleBm(b.dataset.k);bmView()});
 }
 
 function goHome(){ if(history.state&&history.state.q) history.back(); else home(); }
@@ -274,7 +336,7 @@ const BLOCK=15; // हर इतने प्रश्नों के बाद
 // AdSense (वेब/होस्टेड ऐप): publisher ID + विज्ञापन-यूनिट का slot ID (AdSense में Ad unit बनाकर यहाँ डालें)
 const ADSENSE_CLIENT="ca-pub-2502519038232049", ADSENSE_SLOT="";
 // AdMob IDs (सिर्फ़ native Android ऐप के लिए; इस वेब ऐप में काम नहीं करते):
-// App ID ca-app-pub-2502519038232049~2379334402 · Banner ca-app-pub-2502519038232049/5595690536
+// App ID ca-app-pub-2502519038232049~2379334402 · Banner ca-app-pub-2502519038232049/5595690536 · Interstitial ca-app-pub-2502519038232049/7555924876
 (function(){
   if(!/^https?:/.test(location.protocol)||location.hostname==="appassets.androidplatform.net") return;
   const sc=document.createElement("script"); sc.async=true; sc.crossOrigin="anonymous";
@@ -292,33 +354,50 @@ function adBox(){
 function runAd(){ if(ADSENSE_SLOT){try{(window.adsbygoogle=window.adsbygoogle||[]).push({})}catch(e){}} }
 
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
-function start(sub){
-  quiz={sub,qs:bank[sub],bag:[],round:0,units:0,last:-1,log:[],pos:-1,bs:0};
-  pushS(); advance();
+function start(sub,mode){
+  const qs=bank[sub];
+  quiz={sub,qs,mode:mode||"n",bag:[],round:0,units:0,last:-1,log:[],pos:-1,bs:0,queue:[],blk:BLOCK,tel:0,timing:false,lt:0};
+  if(quiz.mode==="w"){
+    const w=new Set(SP(sub).wr);
+    quiz.queue=shuffle(qs.map((x,i)=>w.has(x.k)?i:-1).filter(i=>i>=0));
+    if(!quiz.queue.length){home();return}
+  }
+  pushS(); newBlock(); advance();
+}
+function newBlock(){
+  quiz.bs=quiz.log.length;
+  quiz.blk=quiz.mode==="w"?Math.min(BLOCK,quiz.queue.length):BLOCK;
+  quiz.tel=0; quiz.timing=true; startTick();
 }
 function nextQ(){
-  const n=quiz.qs.length;
+  if(quiz.mode==="w") return quiz.queue.shift();
+  const n=quiz.qs.length, sp=SP(quiz.sub);
   if(!quiz.bag.length){
-    quiz.round++;
-    const b=shuffle([...Array(n).keys()]);
-    if(n>1&&b[b.length-1]===quiz.last){[b[0],b[b.length-1]]=[b[b.length-1],b[0]]}
-    quiz.bag=b;
+    const cyc=new Set(sp.cyc);
+    let cand=[...Array(n).keys()].filter(i=>!cyc.has(quiz.qs[i].k));
+    if(!cand.length){ sp.cyc=[]; cand=[...Array(n).keys()]; quiz.round++ }
+    shuffle(cand);
+    if(cand.length>1&&cand[cand.length-1]===quiz.last){[cand[0],cand[cand.length-1]]=[cand[cand.length-1],cand[0]]}
+    quiz.bag=cand;
   }
-  const c=quiz.bag.pop(); quiz.last=c; return c;
+  const c=quiz.bag.pop(); quiz.last=c;
+  sp.cyc.push(quiz.qs[c].k); save();
+  return c;
 }
 function advance(){ quiz.log.push({i:nextQ(),pick:null,pts:0}); quiz.pos=quiz.log.length-1; show(); }
 
 function show(){
   const e=quiz.log[quiz.pos], q=quiz.qs[e.i], answered=e.pick!=null;
   const inBlock=quiz.log.length-quiz.bs, pib=quiz.pos-quiz.bs+1;
-  const endOfBlock=quiz.pos===quiz.log.length-1&&inBlock>=BLOCK;
-  app.innerHTML=`<div class="bar"><div class="bar-r"><button class="btn sm" id="back">← विषय बदलें</button><div class="meta">${esc(quiz.sub)}<br>अंक <b id="sc">${fmt(quiz.units)}</b> · प्रश्न ${pib}/${BLOCK}</div></div><div class="prog"><i style="width:${pib/BLOCK*100}%"></i></div></div>
-  <div class="qc"><p class="q">${esc(q.q)}</p></div>
+  const endOfBlock=quiz.pos===quiz.log.length-1&&inBlock>=quiz.blk;
+  const isBm=P.bm.indexOf(q.k)>=0;
+  app.innerHTML=`<div class="bar"><div class="bar-r"><button class="btn sm" id="back">← विषय बदलें</button><div class="meta">${esc(quiz.sub)}${quiz.mode==="w"?" · गलत दोहराव":""}<br>अंक <b id="sc">${fmt(quiz.units)}</b> · प्रश्न ${pib}/${quiz.blk}<br>⏱ <span id="tm">--:--</span></div></div><div class="prog"><i style="width:${pib/quiz.blk*100}%"></i></div></div>
+  <div class="qc"><div class="qrow"><p class="q">${esc(q.q)}</p><button class="starb ${isBm?"on":""}" id="bm" aria-label="सहेजें">${isBm?"★":"☆"}</button></div>${quiz.mode==="w"?'<span class="pill g">पहले गलत हुआ था</span>':""}</div>
   ${q.o.map((t,i)=>`<button class="opt" data-k="${i}"><span class="l">${L[i]}</span><span>${esc(t)}</span></button>`).join("")}
   <button class="btn ghost sm" id="hb">💡 संकेत देखें</button>
   <div class="hint hide" id="hint">${esc(q.h||"इस प्रश्न के लिए संकेत उपलब्ध नहीं है।")}</div>
   <div class="exp hide" id="exp"><b>व्याख्या:</b> ${esc(q.e||"व्याख्या उपलब्ध नहीं है।")}</div>
-  <div class="nav"><button class="btn ghost" id="prev" ${quiz.pos>quiz.bs?"":"disabled"}>‹ पिछला प्रश्न</button><button class="btn ghost ${answered?"hide":""}" id="skip">छोड़ें ⏭</button><button class="btn hide" id="next">${endOfBlock?"15 पूरे · आगे →":"अगला प्रश्न ›"}</button></div>`;
+  <div class="nav"><button class="btn ghost" id="prev" ${quiz.pos>quiz.bs?"":"disabled"}>‹ पिछला प्रश्न</button><button class="btn ghost ${answered?"hide":""}" id="skip">छोड़ें ⏭</button><button class="btn hide" id="next">${endOfBlock?inBlock+" पूरे · आगे →":"अगला प्रश्न ›"}</button></div>`;
   window.scrollTo(0,0);
   const opts=app.querySelectorAll(".opt"), $=id=>document.getElementById(id);
   const lock=()=>{
@@ -328,55 +407,99 @@ function show(){
     $("exp").classList.remove("hide"); $("next").classList.remove("hide"); $("skip").classList.add("hide");
   };
   if(answered) lock();
+  paintT();
   $("back").onclick=goHome;
   $("hb").onclick=()=>$("hint").classList.toggle("hide");
+  $("bm").onclick=()=>{const on=toggleBm(q.k);$("bm").textContent=on?"★":"☆";$("bm").classList.toggle("on",on)};
   opts.forEach(b=>b.onclick=()=>{
     if(e.pick!=null) return;
-    e.pick=+b.dataset.k; e.pts=e.pick===q.a?6:-1; quiz.units+=e.pts;
+    e.pick=+b.dataset.k; e.pts=e.pick===q.a?6:-2; quiz.units+=e.pts;
+    const sp=SP(quiz.sub);
+    if(quiz.mode==="n"){ if(e.pick===q.a) sp.r++; else sp.w++; }
+    P.u+=e.pts; // दोहराव के अंक भी कुल अंक में जुड़ते हैं
+    if(sp.done.indexOf(q.k)<0) sp.done.push(q.k);
+    const wi=sp.wr.indexOf(q.k);
+    if(e.pick===q.a){ if(wi>=0) sp.wr.splice(wi,1) } else if(wi<0) sp.wr.push(q.k);
+    save();
     $("sc").textContent=fmt(quiz.units); lock();
     $("next").scrollIntoView({block:"nearest",behavior:"smooth"});
   });
   $("prev").onclick=()=>{ if(quiz.pos>quiz.bs){quiz.pos--;show()} };
   const goNext=()=>{
     if(quiz.pos<quiz.log.length-1){quiz.pos++;show();return}
-    if(quiz.log.length-quiz.bs>=BLOCK){adScreen();return}
+    if(quiz.log.length-quiz.bs>=quiz.blk){finishBlock();return}
     advance();
   };
   $("next").onclick=goNext;
-  $("skip").onclick=()=>{ if(e.pick!=null) return; e.pick=-1; e.pts=0; goNext(); };
+  $("skip").onclick=()=>{
+    if(e.pick!=null) return; e.pick=-1; e.pts=0;
+    if(quiz.mode==="n"){ SP(quiz.sub).s++; save(); }
+    goNext();
+  };
+}
+
+function finishBlock(){
+  quiz.timing=false;
+  if(quiz.mode==="w"&&quiz.blk<MINW) review(); else adScreen();
 }
 
 function adScreen(){
   app.innerHTML=`<div class="bar"><button class="btn sm" id="back">← विषय बदलें</button></div>
-  <div class="card" style="text-align:center"><div style="font-size:2rem">🎯</div><h3>${BLOCK} प्रश्न पूरे हुए!</h3><div style="color:var(--mut);font-size:.9rem">उत्तर और व्याख्या देखने के लिए नीचे दबाएँ</div></div>
+  <div class="card" style="text-align:center"><div style="font-size:2rem">🎯</div><h3>${quiz.blk} प्रश्न पूरे हुए!</h3><div style="color:var(--mut);font-size:.9rem">उत्तर और व्याख्या देखने के लिए नीचे दबाएँ</div></div>
   ${adBox()}
   <button class="btn full" id="see">उत्तर देखें →</button>`;
   window.scrollTo(0,0); runAd();
   document.getElementById("back").onclick=goHome;
-  document.getElementById("see").onclick=review;
+  document.getElementById("see").onclick=()=>{
+    // Android ऐप में: पहले पूरी स्क्रीन का विज्ञापन, उसके बंद होने पर उत्तर
+    if(NATIVE&&window.AndroidAds&&!window.__adBusy){
+      window.__adBusy=true;
+      let done=false;
+      const go=()=>{ if(done) return; done=true; window.__adBusy=false; window.onAdDone=null; review(); };
+      window.onAdDone=go;
+      setTimeout(go,15000); // सुरक्षा: विज्ञापन अटके तो भी उत्तर खुल जाएँ
+      try{ window.AndroidAds.showInterstitial(); }catch(e){ go(); }
+    } else review();
+  };
 }
 
 function review(){
   const ents=quiz.log.slice(quiz.bs); let r=0,w=0,sk=0,u=0;
   ents.forEach(e=>{ if(e.pick==null||e.pick<0){sk++;return} if(e.pick===quiz.qs[e.i].a)r++; else w++; u+=e.pts });
+  const used=Math.round(quiz.tel), lim=quiz.blk*SECQ, over=used>lim;
+  const left=quiz.mode==="w"?quiz.queue.length:1;
+  const nextN=quiz.mode==="w"?Math.min(BLOCK,quiz.queue.length):BLOCK;
   app.innerHTML=`<div class="bar"><button class="btn sm" id="back">← विषय बदलें</button></div>
-  <div class="card"><h3>इन ${ents.length} प्रश्नों का परिणाम</h3>
-    <div class="sumrow"><div><b>${r}</b><span>सही (+2)</span></div><div><b>${w}</b><span>गलत (−⅓)</span></div><div><b>${sk}</b><span>छोड़े (0)</span></div><div><b>${fmt(u)}</b><span>अंक</span></div></div>
-    <div style="font-size:.9rem;color:var(--mut)">अब तक कुल अंक: <b>${fmt(quiz.units)}</b></div></div>
+  <div class="card"><h3>इन ${ents.length} प्रश्नों का परिणाम${quiz.mode==="w"?" (गलत दोहराव)":""}</h3>
+    <div class="sumrow"><div><b>${r}</b><span>सही (+2)</span></div><div><b>${w}</b><span>गलत (−⅔)</span></div><div><b>${sk}</b><span>छोड़े (0)</span></div><div><b>${fmt(u)}</b><span>अंक</span></div></div>
+    <div style="font-size:.9rem;color:var(--mut)">⏱ समय: <b${over?' style="color:var(--bad)"':""}>${fmtT(used)}</b> / ${fmtT(lim)}${over?" · समय सीमा से अधिक":""}</div>
+    <div style="font-size:.9rem;color:var(--mut)">अब तक कुल अंक: <b>${fmt(P.u)}</b></div></div>
   ${ents.map((e,k)=>{const q=quiz.qs[e.i],ok=e.pick===q.a;
     return `<div class="card"><div class="rq">${k+1}. ${esc(q.q)}</div>`+
     (e.pick==null||e.pick<0?`<div class="ra">⏭ छोड़ा गया</div><div class="ra ok">✓ सही उत्तर: ${L[q.a]}. ${esc(q.o[q.a])}</div>`:ok?`<div class="ra ok">✓ आपका उत्तर सही: ${L[q.a]}. ${esc(q.o[q.a])}</div>`:
         `<div class="ra bad">✗ आपका उत्तर: ${L[e.pick]}. ${esc(q.o[e.pick])}</div><div class="ra ok">✓ सही उत्तर: ${L[q.a]}. ${esc(q.o[q.a])}</div>`)+
     (q.e?`<div class="rx">${esc(q.e)}</div>`:"")+`</div>`}).join("")}
-  <button class="btn full" id="more">अगले ${BLOCK} प्रश्न →</button>`;
+  <button class="btn full" id="more">${left?`अगले ${nextN} प्रश्न →`:"✓ सारे गलत प्रश्न पूरे · होम"}</button>`;
   window.scrollTo(0,0);
   document.getElementById("back").onclick=goHome;
-  document.getElementById("more").onclick=()=>{quiz.bs=quiz.log.length;advance()};
+  document.getElementById("more").onclick=()=>{ if(!left){goHome();return} newBlock(); advance(); };
 }
 
-document.getElementById("rf").onclick=load;
+const POLICY="https://ranjanakhess6001-spec.github.io/dipraclassescg/privacy.html";
+const OKK="cgem_ok_v1";
+function gate(){
+  if(LS(OKK)==="1"){ load(); return }
+  app.innerHTML=`<div class="card" style="margin-top:18px"><h3>स्वागत है 👋</h3><div style="color:var(--mut);font-size:.92rem">जारी रखने के लिए प्राइवेसी पॉलिसी पढ़ें और नीचे टिक करें।</div></div>
+  <label class="ck"><input type="checkbox" id="ckb"><span>मैंने <a href="${POLICY}" target="_blank" rel="noopener">प्राइवेसी पॉलिसी</a> पढ़ ली है और मैं उससे सहमत हूँ।</span></label>
+  <button class="btn full" id="go" disabled>स्वीकार करें और शुरू करें</button>
+  <p class="note" style="text-align:center">यह स्क्रीन सिर्फ़ पहली बार दिखेगी।</p>`;
+  const ckb=document.getElementById("ckb"), go=document.getElementById("go");
+  ckb.onchange=()=>{go.disabled=!ckb.checked};
+  go.onclick=()=>{ if(!ckb.checked) return; LSset(OKK,"1"); load(); };
+}
+document.getElementById("rf").onclick=()=>{ if(LS(OKK)==="1") load(); };
 if("serviceWorker" in navigator){navigator.serviceWorker.register("sw.js").catch(()=>{})}
-load();
+gate();
 </script>
 </body>
 </html>
